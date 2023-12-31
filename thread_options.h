@@ -72,17 +72,18 @@ struct zone_split {
 
 #define OPT_MAGIC	0x4f50544e
 
+/* 参数列表解析后的结果存放结构体 */
 struct thread_options {
 	int magic;
 	uint64_t set_options[NR_OPTS_SZ];
 	char *description;
-	char *name;
+	char *name;       /* fio -name=TEST_8K_SEQ */
 	char *wait_for;
-	char *directory;
-	char *filename;
+	char *directory;  /* fio -directory=/mnt/test_8k/ */
+	char *filename;   /* fio -filename=/dev/nvme0n1 */
 	char *filename_format;
 	char *opendir;
-	char *ioengine;
+	char *ioengine;  /* fio -ioengine=psync|libaio|... */
 	char *ioengine_so_path;
 	char *mmapfile;
 	enum td_ddir td_ddir;
@@ -100,8 +101,8 @@ struct thread_options {
 
 	unsigned int unique_filename;
 
-	unsigned long long size;
-	unsigned long long io_size;
+	unsigned long long size;            /* fio -size=10M */
+	unsigned long long io_size; 
 	unsigned int size_percent;
 	unsigned int size_nz;
 	unsigned int io_size_percent;
@@ -110,7 +111,7 @@ struct thread_options {
 	unsigned int file_append;
 	unsigned long long file_size_low;
 	unsigned long long file_size_high;
-	unsigned long long start_offset;
+	unsigned long long start_offset;   /* fio -offset=0 */
 	unsigned long long start_offset_align;
 	unsigned int start_offset_nz;
 

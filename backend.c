@@ -1031,7 +1031,7 @@ static void do_io(struct thread_data *td, uint64_t *bytes_done)
 		     (td->o.time_based && td->o.verify != VERIFY_NONE)))
 			break;
 
-		io_u = get_io_u(td);
+		io_u = get_io_u(td);  /* 生成IO片段 */
 		if (IS_ERR_OR_NULL(io_u)) {
 			int err = PTR_ERR(io_u);
 
@@ -1112,7 +1112,7 @@ static void do_io(struct thread_data *td, uint64_t *bytes_done)
 			}
 
 		} else {
-			ret = io_u_submit(td, io_u);
+			ret = io_u_submit(td, io_u);  /* 提交IO UNIT */
 
 			if (should_check_rate(td))
 				td->rate_next_io_time[ddir] = usec_for_io(td, ddir);
@@ -1321,7 +1321,7 @@ static int init_io_u(struct thread_data *td)
 		}
 	}
 
-	if (init_io_u_buffers(td))
+	if (init_io_u_buffers(td))  /* 生成原始的数据来源 */
 		return 1;
 
 	if (init_file_completion_logging(td, max_units))
@@ -1816,7 +1816,7 @@ static void *thread_main(void *data)
 		td->ts.ioprio = td->ioprio;
 	}
 
-	if (td_io_init(td))
+	if (td_io_init(td))  /* 调用ioengine->init */
 		goto err;
 
 	if (td_ioengine_flagged(td, FIO_SYNCIO) && td->o.iodepth > 1 && td->o.io_submit_mode != IO_MODE_OFFLOAD) {
@@ -1883,7 +1883,7 @@ static void *thread_main(void *data)
 	memset(bytes_done, 0, sizeof(bytes_done));
 	clear_state = false;
 
-	while (keep_running(td)) {
+	while (keep_running(td)) {  /* 循环生成IO并运行 */
 		uint64_t verify_bytes;
 
 		fio_gettime(&td->start, NULL);
@@ -2391,7 +2391,7 @@ static void run_threads(struct sk_out *sk_out)
 		 * we don't want X number of threads getting their
 		 * client data interspersed on disk
 		 */
-		if (setup_files(td)) {
+		if (setup_files(td)) {  // 组装结构fio_file，用于每个线程操作文件的抽象
 reap:
 			exit_value++;
 			if (td->error)

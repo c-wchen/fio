@@ -5379,7 +5379,7 @@ void fio_options_dup_and_init(struct option *long_options)
 	while (long_options[i].name)
 		i++;
 
-	options_to_lopts(fio_options, long_options, i, FIO_GETOPT_JOB);
+	options_to_lopts(fio_options, long_options, i, FIO_GETOPT_JOB);   /* 将job cmd 参数填充FIO_GETOPT_JOB */
 }
 
 struct fio_keyword {

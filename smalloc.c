@@ -32,19 +32,20 @@ static const int int_mask = sizeof(int) - 1;
 #endif
 
 struct pool {
-	struct fio_sem *lock;			/* protects this pool */
-	void *map;				/* map of blocks */
-	unsigned int *bitmap;			/* blocks free/busy map */
-	size_t free_blocks;		/* free blocks */
-	size_t nr_blocks;			/* total blocks */
-	size_t next_non_full;
-	size_t mmap_size;
+	struct fio_sem *lock;			/* protects this pool： 多线程互斥保护pool操作 */
+	void *map;				        /* map of blocks：指向数据开始区域，后续分配内存按照map + offset算出分配的内存地址 */
+	unsigned int *bitmap;			/* blocks free/busy map: 0标识未使用，1表示已经使用 */
+	size_t free_blocks;		        /* free blocks: 按照32B为单位*/
+	size_t nr_blocks;			    /* total blocks：按照1K为单位的块个数，1K的块使用int大小bitmap进行记录 */
+	size_t next_non_full;           /* 从左到右第一个非满的块 */
+	size_t mmap_size;               /* 实际从内核mmap分配的虚拟内存大小 */
 };
 
+/* 每次分配内存块的控制头 */
 struct block_hdr {
-	size_t size;
+	size_t size;         /* 分配的大小 */
 #ifdef SMALLOC_REDZONE
-	unsigned int prered;
+	unsigned int prered;  /* 踩内存检查机制 */
 #endif
 };
 
@@ -54,9 +55,9 @@ struct block_hdr {
  */
 static const bool enable_smalloc_debug = false;
 
-static struct pool *mp;
-static unsigned int nr_pools;
-static unsigned int last_pool;
+static struct pool *mp;        /* pool数组，只有16个元素 */
+static unsigned int nr_pools;  /* 记录当前的pool个数，最多16个 */
+static unsigned int last_pool; /* 最后一个pool，用于加快分配查找pool速度，先从最后一个pool进行分配 */
 
 static inline int ptr_valid(struct pool *pool, void *ptr)
 {
@@ -67,7 +68,7 @@ static inline int ptr_valid(struct pool *pool, void *ptr)
 
 static inline size_t size_to_blocks(size_t size)
 {
-	return (size + SMALLOC_BPB - 1) / SMALLOC_BPB;
+	return (size + SMALLOC_BPB - 1) / SMALLOC_BPB;  /* 向上SMALLOC_BPB对齐申请内存 */
 }
 
 static int blocks_iter(struct pool *pool, unsigned int pool_idx,
@@ -156,20 +157,20 @@ static bool add_pool(struct pool *pool, unsigned int alloc_size)
 	int mmap_flags;
 	void *ptr;
 
-	if (nr_pools == MAX_POOLS)
+	if (nr_pools == MAX_POOLS)  /* 最大的池个数 */
 		return false;
 
 #ifdef SMALLOC_REDZONE
-	alloc_size += sizeof(unsigned int);
+	alloc_size += sizeof(unsigned int);  /* 毒区域，防止踩内存，释放时检查 */
 #endif
 	alloc_size += sizeof(struct block_hdr);
 	if (alloc_size < INITIAL_SIZE)
-		alloc_size = INITIAL_SIZE;
+		alloc_size = INITIAL_SIZE;  /* 按照最小粒度16M来申请 */
 
 	/* round up to nearest full number of blocks */
-	alloc_size = (alloc_size + SMALLOC_BPL - 1) & ~(SMALLOC_BPL - 1);
-	bitmap_blocks = alloc_size / SMALLOC_BPL;
-	alloc_size += bitmap_blocks * sizeof(unsigned int);
+	alloc_size = (alloc_size + SMALLOC_BPL - 1) & ~(SMALLOC_BPL - 1);  // 按照1K对齐
+	bitmap_blocks = alloc_size / SMALLOC_BPL;  // 32位标识1K的数据块
+	alloc_size += bitmap_blocks * sizeof(unsigned int);  // 将bitmap和数据块一起申请
 	pool->mmap_size = alloc_size;
 
 	pool->nr_blocks = bitmap_blocks;
@@ -187,7 +188,7 @@ static bool add_pool(struct pool *pool, unsigned int alloc_size)
 		goto out_fail;
 
 	pool->map = ptr;
-	pool->bitmap = (unsigned int *)((char *) ptr + (pool->nr_blocks * SMALLOC_BPL));
+	pool->bitmap = (unsigned int *)((char *) ptr + (pool->nr_blocks * SMALLOC_BPL));  /* 尾部作为bitmap数据区域 */
 	memset(pool->bitmap, 0, bitmap_blocks * sizeof(unsigned int));
 
 	pool->lock = fio_sem_init(FIO_SEM_UNLOCKED);
@@ -222,8 +223,8 @@ void sinit(void)
 		assert(mp != MAP_FAILED);
 	}
 
-	for (i = 0; i < INITIAL_POOLS; i++) {
-		ret = add_pool(&mp[nr_pools], smalloc_pool_size);
+	for (i = 0; i < INITIAL_POOLS; i++) { /* 预先分配8个POOL */
+		ret = add_pool(&mp[nr_pools], smalloc_pool_size);  // smalloc_pool_size = 16M
 		if (!ret)
 			break;
 	}
@@ -317,7 +318,7 @@ static void sfree_pool(struct pool *pool, void *ptr)
 
 	assert(ptr_valid(pool, ptr));
 
-	sfree_check_redzone(hdr);
+	sfree_check_redzone(hdr);  /* 释放检查读取，防止局部释放或者头部被踩 */
 
 	offset = ptr - pool->map;
 	i = offset / SMALLOC_BPL;
@@ -383,11 +384,11 @@ static void *__smalloc_pool(struct pool *pool, size_t size)
 
 	fio_sem_down(pool->lock);
 
-	nr_blocks = size_to_blocks(size);
+	nr_blocks = size_to_blocks(size);   /* 将分配对齐块大小（32B） */
 	if (nr_blocks > pool->free_blocks)
 		goto fail;
 
-	pool->next_non_full = find_best_index(pool);
+	pool->next_non_full = find_best_index(pool);  /* 查找第一个非满的1K块索引 */
 
 	last_idx = 0;
 	offset = -1U;
@@ -401,8 +402,9 @@ static void *__smalloc_pool(struct pool *pool, size_t size)
 			continue;
 		}
 
-		idx = find_next_zero(pool->bitmap[i], last_idx);
-		if (!blocks_free(pool, i, idx, nr_blocks)) {
+		idx = find_next_zero(pool->bitmap[i], last_idx);  /* 查找从last_idex开始的第一个0的位置 */
+		if (!blocks_free(pool, i, idx, nr_blocks)) {  /* 从idx开始尝试分配nr_blocks大小的数据块 */
+            /* 未分配成功处理逻辑，跳过nr_blocks大小未分配成功的区域开始分配 */
 			idx += nr_blocks;
 			if (idx < SMALLOC_BPI)
 				last_idx = idx;

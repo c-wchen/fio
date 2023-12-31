@@ -187,9 +187,9 @@ struct zone_split_index {
 struct thread_data {
 	struct flist_head opt_list;
 	unsigned long long flags;
-	struct thread_options o;
-	void *eo;
-	pthread_t thread;
+	struct thread_options o;  /* FIO解析后的参数 */
+	void *eo;                 /* 引擎特有options参数，用来存储参数解析的数据 */
+	pthread_t thread;         /* 执行线程 */
 	unsigned int thread_number;
 	unsigned int subjob_number;
 	unsigned int groupid;
@@ -295,13 +295,13 @@ struct thread_data {
 	 * IO engine hooks, contains everything needed to submit an io_u
 	 * to any of the available IO engines.
 	 */
-	struct ioengine_ops *io_ops;
+	struct ioengine_ops *io_ops;   /* 引擎的操作函数 */
 	int io_ops_init;
 
 	/*
 	 * IO engine private data and dlhandle.
 	 */
-	void *io_ops_data;
+	void *io_ops_data;   /* 储存引擎的私有参数 */
 
 	/*
 	 * Queue depth of io_u's that fio MIGHT do

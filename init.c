@@ -494,7 +494,7 @@ static struct thread_data *get_new_job(bool global, struct thread_data *parent,
 
 	seg = &segments[cur_segment];
 	td = &seg->threads[seg->nr_threads++];
-	thread_number++;
+	thread_number++;  /* 生成一个job添加一个线程 */
 	*td = *parent;
 
 	INIT_FLIST_HEAD(&td->opt_list);
@@ -1797,7 +1797,7 @@ static int add_job(struct thread_data *td, const char *jobname, int job_add_num,
 	 */
 	numjobs = o->numjobs;
 	while (--numjobs) {
-		struct thread_data *td_new = get_new_job(false, td, true, jobname);
+		struct thread_data *td_new = get_new_job(false, td, true, jobname);  /* 根据numjobs生成多个thread_data结构 */
 
 		if (!td_new)
 			goto err;
@@ -2726,11 +2726,12 @@ int parse_cmd_line(int argc, char *argv[], int client_type)
 				free(exec_profile);
 			exec_profile = strdup(optarg);
 			break;
-		case FIO_GETOPT_JOB: {
+		case FIO_GETOPT_JOB: {  /* 引擎公共参数,如-name=TEST_8K_SEQ -rw=write -thread等参数 */
 			const char *opt = l_opts[lidx].name;
 			char *val = optarg;
 
 			if (!strncmp(opt, "name", 4) && td) {
+                /* 第一个之外的job, 命令行中一个-name选项代表一个jobs */
 				ret = add_job(td, td->o.name ?: "fio", 0, 0, client_type);
 				if (ret)
 					goto out_free;
@@ -2747,7 +2748,7 @@ int parse_cmd_line(int argc, char *argv[], int client_type)
 				if (is_section && skip_this_section(val))
 					continue;
 
-				td = get_new_job(global, &def_thread, true, NULL);
+				td = get_new_job(global, &def_thread, true, NULL);  /* 第一个job， 根据default thread_data生成 */
 				if (!td || ioengine_load(td)) {
 					if (td) {
 						put_job(td);
@@ -2784,11 +2785,11 @@ int parse_cmd_line(int argc, char *argv[], int client_type)
 					exit_val = 1;
 					break;
 				}
-				fio_options_set_ioengine_opts(l_opts, td);
+				fio_options_set_ioengine_opts(l_opts, td);  /* 在l_opts常参数后面扩展引擎私有参数选项，对应值为FIO_GETOPT_IOENGINE */
 			}
 			break;
 		}
-		case FIO_GETOPT_IOENGINE: {
+		case FIO_GETOPT_IOENGINE: {  /* 引擎私有参数，每个自定义引擎可以添加私有参数来扩展ioengine.options */
 			const char *opt = l_opts[lidx].name;
 			char *val = optarg;
 
@@ -3008,7 +3009,7 @@ int parse_cmd_line(int argc, char *argv[], int client_type)
 
 	if (td) {
 		if (!ret) {
-			ret = add_job(td, td->o.name ?: "fio", 0, 0, client_type);
+			ret = add_job(td, td->o.name ?: "fio", 0, 0, client_type);  /* 根据numjobs个数创建td */
 			if (ret)
 				exit(1);
 		}
@@ -3031,7 +3032,7 @@ int fio_init_options(void)
 	f_err = stderr;
 
 	fio_options_fill_optstring();
-	fio_options_dup_and_init(l_opts);
+	fio_options_dup_and_init(l_opts);  /* 将job cmd参数填充到l_opts中 */
 
 	atexit(free_shm);
 
@@ -3053,7 +3054,7 @@ int parse_options(int argc, char *argv[])
 	if (fio_test_cconv(&def_thread.o))
 		log_err("fio: failed internal cconv test\n");
 
-	job_files = parse_cmd_line(argc, argv, type);
+	job_files = parse_cmd_line(argc, argv, type);  // 解析外部命令行参数
 
 	if (job_files > 0) {
 		for (i = 0; i < job_files; i++) {

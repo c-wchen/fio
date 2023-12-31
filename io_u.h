@@ -28,8 +28,8 @@ enum {
  * The io unit
  */
 struct io_u {
-	struct timespec start_time;
-	struct timespec issue_time;
+	struct timespec start_time;   /* 开始时间 */
+	struct timespec issue_time; 
 
 	struct fio_file *file;
 	unsigned int flags;
@@ -39,7 +39,7 @@ struct io_u {
 	 * For replay workloads, we may want to account as a different
 	 * IO type than what is being submitted.
 	 */
-	enum fio_ddir acct_ddir;
+	enum fio_ddir acct_ddir;   /* data direction, 简单理解数据的操作类型 */
 
 	/*
 	 * Write generation
@@ -55,15 +55,15 @@ struct io_u {
 	/*
 	 * Allocated/set buffer and length
 	 */
-	unsigned long long buflen;
-	unsigned long long offset;	/* is really ->xfer_offset... */
-	unsigned long long verify_offset;	/* is really ->offset */
-	void *buf;
+	unsigned long long buflen;                                      /* 数据的长度 */
+	unsigned long long offset;	/* is really ->xfer_offset... */    /* 数据的偏移 */
+	unsigned long long verify_offset;	/* is really ->offset */    /* 验证的偏移 */
+	void *buf;                                                      /* 写入的数据 */
 
 	/*
 	 * Initial seed for generating the buffer contents
 	 */
-	uint64_t rand_seed;
+	uint64_t rand_seed;                                             /* 随机种子 */
 
 	/*
 	 * IO engine state, may be different from above when we get

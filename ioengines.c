@@ -385,7 +385,7 @@ enum fio_q_status td_io_queue(struct thread_data *td, struct io_u *io_u)
 		td->rate_io_issue_bytes[ddir] += buflen;
 	}
 
-	ret = td->io_ops->queue(td, io_u);
+	ret = td->io_ops->queue(td, io_u);  /* 调用引擎进行写数据 */
 	zbd_queue_io_u(td, io_u, ret);
 
 	unlock_file(td, io_u->file);
@@ -443,7 +443,7 @@ enum fio_q_status td_io_queue(struct thread_data *td, struct io_u *io_u)
 		    (ddir_sync(io_u->ddir) && td->runstate != TD_FSYNCING))
 			td->ts.total_io_u[io_u->ddir]++;
 
-		if (td->io_u_queued >= td->o.iodepth_batch)
+		if (td->io_u_queued >= td->o.iodepth_batch) /* iodepth字段的价值体现，调用engine提交iodepth个IO之后再提交，提高效率，对于同步IO没任务作用 */
 			td_io_commit(td);
 	}
 

@@ -33,11 +33,11 @@ struct ioengine_ops {
 	int flags;
 	void *dlhandle;
 	int (*setup)(struct thread_data *);
-	int (*init)(struct thread_data *);
+	int (*init)(struct thread_data *);                                  /* 初始化操作，比如连接池操作 */
 	int (*post_init)(struct thread_data *);
-	int (*prep)(struct thread_data *, struct io_u *);
-	enum fio_q_status (*queue)(struct thread_data *, struct io_u *);
-	int (*commit)(struct thread_data *);
+	int (*prep)(struct thread_data *, struct io_u *);                   /* 下IO之前的准备工作 */
+	enum fio_q_status (*queue)(struct thread_data *, struct io_u *);    /* 入队操作 */
+	int (*commit)(struct thread_data *);                                /* 提交IO操作，当然非异步的也可以没有该项 */
 	int (*getevents)(struct thread_data *, unsigned int, unsigned int, const struct timespec *);
 	struct io_u *(*event)(struct thread_data *, int);
 	char *(*errdetails)(struct io_u *);
